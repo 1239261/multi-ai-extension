@@ -120,7 +120,8 @@ function handleInputChange(e) {
 }
 
 function handleInputKeydown(e) {
-  if (e.ctrlKey && e.shiftKey && e.key === 'M') {
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
     handleSend();
   }
 }

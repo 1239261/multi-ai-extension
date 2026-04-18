@@ -59,7 +59,7 @@
         "default": "Ctrl+Shift+M",
         "mac": "Command+Shift+M"
       },
-      "description": "发送问题到所有AI"
+      "description": "在输入框中按Enter发送问题"
     }
   }
 }
