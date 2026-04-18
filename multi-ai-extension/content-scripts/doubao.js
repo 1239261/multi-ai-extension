@@ -10,10 +10,16 @@ class DoubaoProvider {
 
   isVisible(element) {
     if (!element) return false;
-    const style = window.getComputedStyle(element);
-    return style.display !== 'none' && 
-           style.visibility !== 'hidden' && 
-           parseFloat(style.opacity) > 0;
+    try {
+      const style = window.getComputedStyle(element);
+      return style.display !== 'none' && 
+             style.visibility !== 'hidden' && 
+             parseFloat(style.opacity) > 0 &&
+             element.offsetWidth > 0 &&
+             element.offsetHeight > 0;
+    } catch (e) {
+      return false;
+    }
   }
 
   findElement(selectors) {
@@ -33,80 +39,46 @@ class DoubaoProvider {
     while (Date.now() - startTime < timeout) {
       const el = this.findElement(selectors);
       if (el) return el;
-      await this.sleep(300);
+      await this.sleep(200);
     }
     return null;
   }
 
   async injectAndSubmit(question) {
-    console.log('Doubao: Waiting for page to be ready...');
+    console.log('Doubao: Waiting for page...');
     await this.sleep(3000);
     
     const inputEl = await this.waitForElement([
       'textarea',
-      'div[contenteditable="true"][role="textbox"]',
-      'div[contenteditable="true"]',
       '[contenteditable="true"]',
       '[role="textbox"]',
       'input[type="text"]'
-    ], 20000);
+    ], 15000);
 
     if (!inputEl) {
-      console.log('Doubao: Looking for input with mutation observer...');
-      return new Promise((resolve, reject) => {
-        const observer = new MutationObserver(() => {
-          const el = this.findElement(['textarea', 'div[contenteditable]', '[role="textbox"]']);
-          if (el) {
-            observer.disconnect();
-            this.doSubmit(el, question).then(resolve).catch(reject);
-          }
-        });
-        
-        observer.observe(document.body, { childList: true, subtree: true });
-        
-        setTimeout(() => {
-          observer.disconnect();
-          reject(new Error('Doubao: Input element not found'));
-        }, 20000);
-      });
+      throw new Error('Doubao: Input not found');
     }
 
-    return this.doSubmit(inputEl, question);
-  }
-
-  async doSubmit(inputEl, question) {
-    console.log('Doubao: Found input, filling text...');
-    
+    console.log('Doubao: Found input, filling...');
     inputEl.focus();
+    
     this.clearInput(inputEl);
-    await this.sleep(300);
+    await this.sleep(200);
     
-    if (inputEl.tagName === 'TEXTAREA' || inputEl.tagName === 'INPUT') {
-      const nativeSetter = Object.getOwnPropertyDescriptor(inputEl.constructor.prototype, 'value')?.set;
-      if (nativeSetter) {
-        nativeSetter.call(inputEl, question);
-      } else {
-        inputEl.value = question;
-      }
-      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-    } else {
-      for (let i = 0; i < question.length; i++) {
-        document.execCommand('insertText', false, question[i]);
-        await this.sleep(10);
-      }
-    }
-    
+    this.fillText(inputEl, question);
     await this.sleep(500);
-    console.log('Doubao: Looking for send button...');
     
-    const sent = await this.trySend();
-    if (!sent) {
-      throw new Error('Doubao: Failed to send message');
+    const btn = this.findSendButton();
+    if (btn) {
+      console.log('Doubao: Clicking send button');
+      btn.click();
+    } else {
+      console.log('Doubao: Button not found, try keyboard');
+      inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+      inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
     }
     
     await this.sleep(2000);
-    console.log('Doubao: Waiting for response...');
     
     const ready = await this.waitForResponse(60000);
     if (!ready) {
@@ -119,59 +91,58 @@ class DoubaoProvider {
     }
   }
 
-  clearInput(element) {
-    element.value = '';
-    element.textContent = '';
-    element.innerHTML = '';
-    element.dispatchEvent(new Event('input', { bubbles: true }));
+  clearInput(el) {
+    el.value = '';
+    el.textContent = '';
+    el.innerHTML = '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  async trySend() {
-    const btn = this.findSendButton();
-    if (btn) {
-      console.log('Doubao: Clicking send button');
-      btn.click();
-      return true;
+  fillText(el, text) {
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+      const setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value')?.set;
+      if (setter) setter.call(el, text);
+      else el.value = text;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+      el.textContent = text;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
     }
-    
-    console.log('Doubao: No button found, trying keyboard...');
-    const input = this.findElement(['textarea:focus', 'div[contenteditable="true"]:focus', '[role="textbox"]:focus', 'input[type="text"]:focus']);
-    if (input) {
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-      input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-      return true;
-    }
-    
-    return false;
   }
 
   findSendButton() {
-    const buttons = document.querySelectorAll('button, [class*="button"], [class*="btn"]');
-    
-    for (const btn of buttons) {
-      if (!this.isVisible(btn) || btn.disabled) continue;
-      
-      const text = (btn.textContent || '').trim().toLowerCase();
-      const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
-      const className = (btn.className || '').toLowerCase();
-      
-      if (text.includes('发送') || text.includes('send') || text.includes('submit') ||
-          aria.includes('发送') || aria.includes('send') ||
-          className.includes('send') || className.includes('submit')) {
-        console.log('Doubao: Found button:', text, aria, className);
-        return btn;
-      }
+    const selectors = [
+      'button#flow-end-msg-send',
+      'button[data-dbx-name="button"]',
+      'button[class*="send"]',
+      '[id="flow-end-msg-send"]',
+      '[data-dbx-name="button"][aria-label*="send"]',
+      '[data-dbx-name="button"][aria-label*="发送"]'
+    ];
+
+    for (const sel of selectors) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && this.isVisible(el)) {
+          console.log('Doubao: Found button with:', sel);
+          return el;
+        }
+      } catch (e) {}
     }
-    
-    if (buttons.length > 0) {
-      for (const btn of buttons) {
-        if (this.isVisible(btn) && !btn.disabled && btn.offsetHeight > 0) {
-          console.log('Doubao: Using fallback button:', btn.textContent?.substring(0, 30));
+
+    const buttons = document.querySelectorAll('button');
+    for (const btn of buttons) {
+      const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+      const id = (btn.id || '').toLowerCase();
+      if (ariaLabel.includes('send') || ariaLabel.includes('发送') ||
+          id.includes('send') || id.includes('msg-send')) {
+        if (this.isVisible(btn)) {
+          console.log('Doubao: Found send button:', id, ariaLabel);
           return btn;
         }
       }
     }
-    
+
     return null;
   }
 
@@ -181,25 +152,25 @@ class DoubaoProvider {
     let stableCount = 0;
     
     while (Date.now() - startTime < timeout) {
-      const response = this.getResponseContent();
+      const content = this.getResponseContent();
       
-      const loading = this.findElement(['[class*="loading"]', '[class*="generating"]', '[class*="thinking"]', '[class*="sending"]']);
+      const loading = this.findElement(['[class*="loading"]', '[class*="generating"]', '[class*="thinking"]']);
       if (loading && this.isVisible(loading)) {
         stableCount = 0;
         await this.sleep(500);
         continue;
       }
       
-      if (response && response.length > 20) {
-        if (response === lastContent) {
+      if (content && content.length > 20) {
+        if (content === lastContent) {
           stableCount++;
           if (stableCount >= 3) {
-            this.lastResponse = response;
+            this.lastResponse = content;
             return true;
           }
         } else {
           stableCount = 0;
-          lastContent = response;
+          lastContent = content;
         }
       }
       
@@ -210,41 +181,41 @@ class DoubaoProvider {
 
   getResponseContent() {
     const selectors = [
-      '[class*="message"]',
-      '[class*="response"]',
-      '[class*="content"]',
-      '[class*="answer"]',
-      '[class*="result"]',
-      '[class*="bubble"]'
+      '[class*="message-content"]',
+      '[class*="bubble-content"]',
+      '[class*="chat-content"]',
+      '[class*="response"]'
     ];
     
     let longest = '';
     for (const sel of selectors) {
-      const els = document.querySelectorAll(sel);
-      for (const el of els) {
-        if (this.isVisible(el)) {
-          const text = el.textContent?.trim() || '';
-          if (text.length > longest.length && text.length > 20) {
-            longest = text;
+      try {
+        const els = document.querySelectorAll(sel);
+        for (const el of els) {
+          if (this.isVisible(el)) {
+            const text = el.textContent?.trim() || '';
+            if (text.length > longest.length && text.length > 20) {
+              longest = text;
+            }
           }
         }
-      }
+      } catch (e) {}
     }
     return longest;
   }
 
   async submitQuestion(question) {
     try {
-      console.log('Doubao: Submitting question:', question.substring(0, 50));
+      console.log('Doubao: Submitting...');
       await this.injectAndSubmit(question);
-      const response = this.getResponseContent();
-      console.log('Doubao: Got response, length:', response?.length);
-      return { provider: 'doubao', content: response || this.lastResponse, status: 'success' };
+      const content = this.getResponseContent();
+      console.log('Doubao: Response length:', content?.length);
+      return { provider: 'doubao', content: content || this.lastResponse, status: 'success' };
     } catch (error) {
       console.error('Doubao error:', error);
-      const response = this.getResponseContent();
-      if (response && response.length > 10) {
-        return { provider: 'doubao', content: response, status: 'success' };
+      const content = this.getResponseContent();
+      if (content && content.length > 10) {
+        return { provider: 'doubao', content, status: 'success' };
       }
       return { provider: 'doubao', content: error.message, status: 'error' };
     }
@@ -264,7 +235,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           status: response.status,
           conversationId: message.conversationId
         });
-        sendResponse({ success: response.status === 'success' });
+        sendResponse({ success: true });
       })
       .catch(error => {
         chrome.runtime.sendMessage({
