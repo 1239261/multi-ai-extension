@@ -49,10 +49,10 @@ class QwenProvider {
     await this.sleep(3000);
     
     const inputEl = await this.waitForElement([
-      'textarea',
-      '[contenteditable="true"]',
-      '[role="textbox"]',
-      'input[type="text"]'
+      'div[role="textbox"]',
+      'div[data-placeholder="向千问提问"]',
+      '[contenteditable="true"][role="textbox"]',
+      'textarea'
     ], 15000);
 
     if (!inputEl) {
@@ -92,9 +92,20 @@ class QwenProvider {
   }
 
   clearInput(el) {
+    el.focus();
     el.value = '';
     el.textContent = '';
     el.innerHTML = '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    document.execCommand('delete', false, null);
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
@@ -105,7 +116,18 @@ class QwenProvider {
       else el.value = text;
       el.dispatchEvent(new Event('input', { bubbles: true }));
     } else {
-      el.textContent = text;
+      el.focus();
+      el.textContent = '';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      document.execCommand('insertText', false, text);
       el.dispatchEvent(new Event('input', { bubbles: true }));
     }
   }
