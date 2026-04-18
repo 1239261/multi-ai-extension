@@ -11,6 +11,7 @@
     "*://qwen.ai/*",
     "*://qwen.cn/*",
     "*://*.qianwen.com/*",
+    "*://www.qianwen.com/*",
     "*://yuanbao.tencent.com/*",
     "*://chat.deepseek.com/*",
     "*://doubao.com/*"
@@ -29,7 +30,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://qwen.ai/*", "*://qwen.cn/*", "*://*.qianwen.com/*"],
+      "matches": ["*://qwen.ai/*", "*://qwen.cn/*", "*://*.qianwen.com/*", "*://www.qianwen.com/*"],
       "js": ["content-scripts/qwen.js"],
       "run_at": "document_end"
     },
