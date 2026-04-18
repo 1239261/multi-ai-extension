@@ -8,11 +8,12 @@
     "storage"
   ],
   "host_permissions": [
-    "https://qwen.ai/*",
-    "https://qwen.cn/*",
-    "https://yuanbao.tencent.com/*",
-    "https://chat.deepseek.com/*",
-    "https://doubao.com/*"
+    "*://qwen.ai/*",
+    "*://qwen.cn/*",
+    "*://*.qianwen.com/*",
+    "*://yuanbao.tencent.com/*",
+    "*://chat.deepseek.com/*",
+    "*://doubao.com/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
@@ -28,24 +29,24 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://qwen.ai/*", "https://qwen.cn/*"],
-      "js": ["content-scripts/base.js", "content-scripts/qwen.js"],
-      "run_at": "document_idle"
+      "matches": ["*://qwen.ai/*", "*://qwen.cn/*", "*://*.qianwen.com/*"],
+      "js": ["content-scripts/qwen.js"],
+      "run_at": "document_end"
     },
     {
-      "matches": ["https://yuanbao.tencent.com/*"],
-      "js": ["content-scripts/base.js", "content-scripts/yuanbao.js"],
-      "run_at": "document_idle"
+      "matches": ["*://yuanbao.tencent.com/*"],
+      "js": ["content-scripts/yuanbao.js"],
+      "run_at": "document_end"
     },
     {
-      "matches": ["https://chat.deepseek.com/*"],
-      "js": ["content-scripts/base.js", "content-scripts/deepseek.js"],
-      "run_at": "document_idle"
+      "matches": ["*://chat.deepseek.com/*"],
+      "js": ["content-scripts/deepseek.js"],
+      "run_at": "document_end"
     },
     {
-      "matches": ["https://doubao.com/*"],
-      "js": ["content-scripts/base.js", "content-scripts/doubao.js"],
-      "run_at": "document_idle"
+      "matches": ["*://doubao.com/*"],
+      "js": ["content-scripts/doubao.js"],
+      "run_at": "document_end"
     }
   ],
   "icons": {
