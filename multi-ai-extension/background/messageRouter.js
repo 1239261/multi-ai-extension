@@ -251,7 +251,7 @@ class MessageRouter {
 
   async findProviderTabs(provider) {
     const providerUrlPatterns = {
-      [PROVIDERS.QWEN]: ['*://qwen.ai/*', '*://qwen.cn/*', '*://*.qianwen.com/*', '*://www.qianwen.com/*'],
+      [PROVIDERS.QWEN]: ['*://qwen.ai/*', '*://qwen.cn/*', '*://*.qianwen.com/*', '*://www.qianwen.com/*', '*://chat.qwen.ai/*'],
       [PROVIDERS.YUANBAO]: ['*://yuanbao.tencent.com/*'],
       [PROVIDERS.DEEPSEEK]: ['*://chat.deepseek.com/*'],
       [PROVIDERS.DOUBAO]: ['*://doubao.com/*']
