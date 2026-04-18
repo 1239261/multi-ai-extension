@@ -49,10 +49,12 @@ class QwenProvider {
     await this.sleep(3000);
     
     const inputEl = await this.waitForElement([
+      'textarea.MessageInput__TextArea--dAQGxw1v',
+      'textarea[class*="MessageInput"]',
+      'textarea',
       'div[role="textbox"]',
-      'div[data-placeholder="向千问提问"]',
-      '[contenteditable="true"][role="textbox"]',
-      'textarea'
+      'div[data-placeholder*="提问"]',
+      '[contenteditable="true"][role="textbox"]'
     ], 15000);
 
     if (!inputEl) {
@@ -134,11 +136,14 @@ class QwenProvider {
 
   findSendButton() {
     const selectors = [
+      'div.MessageInput__Submit--mW8tX660',
+      'div[class*="MessageInput__Submit"]',
+      'i.icon-line-arrow-up',
+      '[class*="Submit"][class*="Icon"]',
       'button[aria-label="发送消息"]',
       'button[aria-label*="发送"]',
       'button[class*="sendChat"]',
-      '[class*="sendChat"]',
-      'button[data-icon-type*="send"]'
+      '[class*="sendChat"]'
     ];
 
     for (const sel of selectors) {
