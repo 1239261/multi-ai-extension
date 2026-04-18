@@ -218,16 +218,21 @@ class MessageRouter {
   }
 
   async findProviderTabs(provider) {
-    const providerUrls = {
-      [PROVIDERS.QWEN]: ['https://qwen.ai/', 'https://qwen.cn/'],
-      [PROVIDERS.YUANBAO]: ['https://yuanbao.tencent.com/'],
-      [PROVIDERS.DEEPSEEK]: ['https://chat.deepseek.com/'],
-      [PROVIDERS.DOUBAO]: ['https://doubao.com/']
+    const providerUrlPatterns = {
+      [PROVIDERS.QWEN]: ['*://qwen.ai/*', '*://qwen.cn/*'],
+      [PROVIDERS.YUANBAO]: ['*://yuanbao.tencent.com/*'],
+      [PROVIDERS.DEEPSEEK]: ['*://chat.deepseek.com/*'],
+      [PROVIDERS.DOUBAO]: ['*://doubao.com/*']
     };
 
-    const urls = providerUrls[provider] || [];
-    const tabs = await chrome.tabs.query({ url: urls.map(u => `${u}*`) });
-    return tabs;
+    const patterns = providerUrlPatterns[provider] || [];
+    try {
+      const tabs = await chrome.tabs.query({ url: patterns });
+      return tabs;
+    } catch (error) {
+      this.logger.error('Failed to query tabs', { provider, error: error.message });
+      return [];
+    }
   }
 
   async handleGetHistory(sendResponse) {

@@ -1,83 +1,27 @@
-class QwenProvider extends BaseProvider {
+class QwenProvider {
   constructor() {
-    super('qwen');
-    
-    this.selectors = {
-      input: 'textarea[placeholder*="输入"], textarea[placeholder*="问题"], div[contenteditable="true"]',
-      submitButton: 'button[type="submit"], button:has-text("发送"), button:has-text("提交")',
-      responseContainer: '.response-content, .message-content, [class*="response"]',
-      loadingIndicator: '.loading, [class*="generating"]'
-    };
+    this.providerName = 'qwen';
+    this.lastResponse = '';
   }
 
-  isAtChatPage() {
-    return this.getCurrentUrl().includes('qwen.ai') || this.getCurrentUrl().includes('qwen.cn');
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async injectAndSubmit(question) {
-    await this.waitForPageReady();
-    
-    const inputEl = await this.findInputElement();
-    if (!inputEl) {
-      throw new Error('Input element not found');
-    }
-
-    await this.fillInput(inputEl, question);
-    await this.sleep(300);
-    
-    const submitBtn = await this.findSubmitButton();
-    if (submitBtn) {
-      submitBtn.click();
-    } else {
-      inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', ctrlKey: true }));
-    }
+  isVisible(element) {
+    if (!element) return false;
+    const style = window.getComputedStyle(element);
+    return style.display !== 'none' && 
+           style.visibility !== 'hidden' && 
+           style.opacity !== '0' &&
+           element.offsetParent !== null;
   }
 
-  async waitForPageReady() {
-    await this.sleep(1000);
-    let retries = 0;
-    while (retries < 10) {
-      if (document.querySelector(this.selectors.input) || await this.findInputElement()) {
-        return;
-      }
-      await this.sleep(500);
-      retries++;
-    }
-  }
-
-  async findInputElement() {
-    const selectors = [
-      'textarea[placeholder*="输入"]',
-      'textarea[placeholder*="问题"]',
-      'textarea[placeholder*="请"]',
-      'div[contenteditable="true"]',
-      '[role="textbox"]',
-      'div[contenteditable]'
-    ];
-
-    for (const selector of selectors) {
-      const el = document.querySelector(selector);
-      if (el && this.isVisible(el)) {
-        return el;
-      }
-    }
-    return null;
-  }
-
-  async findSubmitButton() {
-    const selectors = [
-      'button[type="submit"]',
-      'button:has-text("发送")',
-      'button:has-text("提交")',
-      'button:has-text("问")',
-      '[class*="send"] button',
-      '[class*="submit"] button'
-    ];
-
+  findElement(selectors) {
     for (const selector of selectors) {
       try {
         const el = document.querySelector(selector);
-        if (el && this.isVisible(el) && !el.disabled) {
+        if (el && this.isVisible(el)) {
           return el;
         }
       } catch (e) {
@@ -87,96 +31,137 @@ class QwenProvider extends BaseProvider {
     return null;
   }
 
-  async fillInput(element, text) {
-    element.focus();
+  async waitForElement(selectors, timeout = 10000) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      const el = this.findElement(selectors);
+      if (el) return el;
+      await this.sleep(200);
+    }
+    return null;
+  }
+
+  async injectAndSubmit(question) {
+    await this.sleep(1500);
     
-    if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
-      element.value = text;
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-      element.dispatchEvent(new Event('change', { bubbles: true }));
+    const inputEl = await this.waitForElement([
+      'textarea',
+      'div[contenteditable="true"]',
+      '[role="textbox"]',
+      'input[type="text"]'
+    ], 15000);
+
+    if (!inputEl) {
+      throw new Error('Qwen: Input element not found');
+    }
+
+    this.clearAndFillInput(inputEl, question);
+    await this.sleep(500);
+    
+    const submitBtn = this.findElement([
+      'button[type="submit"]',
+      'button[aria-label*="发送"]',
+      'button[aria-label*="send"]',
+      '[class*="send"]',
+      '[class*="submit"]'
+    ]);
+
+    if (submitBtn) {
+      submitBtn.click();
     } else {
-      for (const char of text) {
-        const selection = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        
-        document.execCommand('insertText', false, char);
-        await this.sleep(5);
-      }
+      inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', ctrlKey: true, bubbles: true }));
+    }
+
+    await this.sleep(1000);
+    
+    const ready = await this.waitForResponse(60000);
+    if (!ready) {
+      throw new Error('Qwen: Response timeout');
     }
   }
 
-  isResponseReady() {
-    const loading = document.querySelector(this.selectors.loadingIndicator);
-    if (loading && this.isVisible(loading)) {
-      return false;
+  clearAndFillInput(element, text) {
+    element.focus();
+    
+    element.value = '';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value') ||
+                                   Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+    
+    if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+      const prototype = element;
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
+      nativeInputValueSetter.call(element, text);
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+      document.execCommand('selectAll', false, null);
+      document.execCommand('insertText', false, text);
     }
+  }
 
-    const responseEls = document.querySelectorAll(this.selectors.responseContainer);
-    for (const el of responseEls) {
-      if (this.isVisible(el) && el.textContent.trim().length > 0) {
-        const currentResponse = el.textContent;
-        if (currentResponse !== this.lastResponse) {
-          this.lastResponse = currentResponse;
-          return true;
-        }
+  async waitForResponse(timeout = 60000) {
+    const startTime = Date.now();
+    let lastContent = '';
+    
+    while (Date.now() - startTime < timeout) {
+      const response = this.getResponseContent();
+      
+      const loadingEl = this.findElement(['[class*="loading"]', '[class*="generating"]', '[class*="thinking"]']);
+      if (loadingEl && this.isVisible(loadingEl)) {
+        await this.sleep(500);
+        continue;
       }
+      
+      if (response && response.length > 10 && response !== lastContent) {
+        this.lastResponse = response;
+        return true;
+      }
+      
+      lastContent = response;
+      await this.sleep(500);
     }
-
     return false;
   }
 
-  async extractResponse() {
-    await this.waitForResponse();
-    
-    const responseEls = document.querySelectorAll(this.selectors.responseContainer);
-    let lastResponse = '';
-    
-    for (const el of responseEls) {
-      if (this.isVisible(el) && el.textContent.trim().length > 0) {
-        lastResponse = el.textContent.trim();
-      }
-    }
-
-    if (!lastResponse) {
-      const allText = document.body.innerText;
-      const lines = allText.split('\n').filter(l => l.trim().length > 0);
-      lastResponse = lines.slice(-10).join('\n');
-    }
-
-    return lastResponse;
-  }
-
-  isVisible(element) {
-    const style = window.getComputedStyle(element);
-    return style.display !== 'none' && 
-           style.visibility !== 'hidden' && 
-           style.opacity !== '0' &&
-           element.offsetParent !== null;
-  }
-
-  checkLoginStatus() {
-    const loginIndicators = [
-      'button:has-text("登录")',
-      'button:has-text("Sign in")',
-      '[href*="login"]',
-      '[href*="signin"]'
+  getResponseContent() {
+    const candidates = [
+      ...document.querySelectorAll('[class*="message"]'),
+      ...document.querySelectorAll('[class*="response"]'),
+      ...document.querySelectorAll('[class*="content"]'),
+      ...document.querySelectorAll('[class*="answer"]')
     ];
-
-    for (const selector of loginIndicators) {
-      try {
-        const el = document.querySelector(selector);
-        if (el && this.isVisible(el)) {
-          return false;
+    
+    let longest = '';
+    for (const el of candidates) {
+      if (this.isVisible(el) && el.textContent.trim().length > longest.length) {
+        const text = el.textContent.trim();
+        if (text.length > 20) {
+          longest = text;
         }
-      } catch (e) {
-        // Skip invalid selectors
       }
     }
-    return true;
+    
+    return longest;
+  }
+
+  async submitQuestion(question) {
+    try {
+      await this.injectAndSubmit(question);
+      const response = this.getResponseContent();
+      return {
+        provider: this.providerName,
+        content: response || this.lastResponse,
+        status: 'success'
+      };
+    } catch (error) {
+      console.error('Qwen error:', error);
+      return {
+        provider: this.providerName,
+        content: '',
+        status: error.message.includes('timeout') ? 'timeout' : 'error'
+      };
+    }
   }
 }
 
@@ -184,8 +169,11 @@ const provider = new QwenProvider();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FORWARD_TO_PROVIDER' && message.provider === 'qwen') {
+    console.log('Qwen: Received question:', message.question);
+    
     provider.submitQuestion(message.question)
       .then(response => {
+        console.log('Qwen: Response:', response);
         chrome.runtime.sendMessage({
           type: 'PROVIDER_RESPONSE',
           provider: 'qwen',
@@ -193,9 +181,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           status: response.status,
           conversationId: message.conversationId
         });
-        sendResponse({ success: true });
+        sendResponse({ success: response.status === 'success' });
       })
       .catch(error => {
+        console.error('Qwen: Error:', error);
         chrome.runtime.sendMessage({
           type: 'PROVIDER_RESPONSE',
           provider: 'qwen',
