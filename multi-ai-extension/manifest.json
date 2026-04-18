@@ -56,8 +56,8 @@
   "commands": {
     "send-question": {
       "suggested_key": {
-        "default": "Ctrl+Enter",
-        "mac": "Command+Enter"
+        "default": "Ctrl+Shift+M",
+        "mac": "Command+Shift+M"
       },
       "description": "发送问题到所有AI"
     }
