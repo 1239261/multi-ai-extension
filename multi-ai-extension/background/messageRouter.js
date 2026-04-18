@@ -187,30 +187,62 @@ class MessageRouter {
       });
 
       try {
-        await chrome.tabs.sendMessage(tab.id, {
-          type: MESSAGE_TYPES.FORWARD_TO_PROVIDER,
-          provider,
-          question,
-          conversationId
-        });
-        this.logger.info('Question sent to provider', { provider, tabId: tab.id, conversationId });
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            type: MESSAGE_TYPES.FORWARD_TO_PROVIDER,
+            provider,
+            question,
+            conversationId
+          });
+          this.logger.info('Question sent to provider', { provider, tabId: tab.id, conversationId });
+        } catch (sendError) {
+          if (sendError.message?.includes('Receiving end does not exist')) {
+            this.logger.warn('Content script not ready, reloading tab', { provider, tabId: tab.id });
+            
+            await chrome.tabs.reload(tab.id);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            try {
+              await chrome.tabs.sendMessage(tab.id, {
+                type: MESSAGE_TYPES.FORWARD_TO_PROVIDER,
+                provider,
+                question,
+                conversationId
+              });
+              this.logger.info('Question sent after reload', { provider, tabId: tab.id });
+            } catch (retryError) {
+              throw new Error('CONTENT_SCRIPT_NOT_READY');
+            }
+          } else {
+            throw sendError;
+          }
+        }
       } catch (error) {
         this.logger.error('Failed to send to provider', { provider, error: error.message });
+        
+        let status = RESPONSE_STATUS.ERROR;
+        let userMessage = '发送失败，请刷新页面后重试';
+        
+        if (error.message === 'CONTENT_SCRIPT_NOT_READY') {
+          status = RESPONSE_STATUS.DISCONNECTED;
+          userMessage = 'AI页面未准备好，请刷新页面后重试';
+        }
+        
         conversationManager.removePendingProvider(conversationId, provider);
         
         conversationManager.addResponse(conversationId, provider, {
           provider,
-          content: '',
+          content: userMessage,
           rawContent: '',
-          status: RESPONSE_STATUS.ERROR,
+          status,
           timestamp: new Date().toISOString()
         });
 
         this.notifyPopup({
           type: MESSAGE_TYPES.AI_RESPONSE,
           provider,
-          content: '',
-          status: RESPONSE_STATUS.ERROR,
+          content: userMessage,
+          status,
           conversationId
         });
       }
