@@ -1,0 +1,22 @@
+{
+  "name": "multi-ai-unified-query",
+  "version": "1.0.0",
+  "description": "A browser extension for querying multiple AI platforms simultaneously",
+  "main": "background/background.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"No tests specified\"",
+    "lint": "echo \"No linter configured\"",
+    "build": "echo \"Extension is ready for manual loading in Chrome\""
+  },
+  "keywords": [
+    "browser-extension",
+    "chrome-extension",
+    "ai",
+    "multi-ai",
+    "qwen",
+    "deepseek"
+  ],
+  "author": "",
+  "license": "MIT"
+}

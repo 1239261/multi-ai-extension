@@ -1,0 +1,65 @@
+{
+  "manifest_version": 3,
+  "name": "Multi-AI Unified Query",
+  "version": "1.0.0",
+  "description": "同时向多个AI平台发送问题，统一查看回复",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://qwen.ai/*",
+    "https://qwen.cn/*",
+    "https://yuanbao.tencent.com/*",
+    "https://chat.deepseek.com/*",
+    "https://doubao.com/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon16.svg",
+      "48": "assets/icons/icon48.svg",
+      "128": "assets/icons/icon128.svg"
+    }
+  },
+  "background": {
+    "service_worker": "background/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://qwen.ai/*", "https://qwen.cn/*"],
+      "js": ["content-scripts/base.js", "content-scripts/qwen.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://yuanbao.tencent.com/*"],
+      "js": ["content-scripts/base.js", "content-scripts/yuanbao.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["content-scripts/base.js", "content-scripts/deepseek.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://doubao.com/*"],
+      "js": ["content-scripts/base.js", "content-scripts/doubao.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "assets/icons/icon16.svg",
+    "48": "assets/icons/icon48.svg",
+    "128": "assets/icons/icon128.svg"
+  },
+  "commands": {
+    "send-question": {
+      "suggested_key": {
+        "default": "Ctrl+Enter",
+        "mac": "Command+Enter"
+      },
+      "description": "发送问题到所有AI"
+    }
+  }
+}
