@@ -49,6 +49,7 @@ class QwenProvider {
     await this.sleep(3000);
     
     const inputEl = await this.waitForElement([
+      'textarea.message-input-textarea',
       'textarea.MessageInput__TextArea--dAQGxw1v',
       'textarea[class*="MessageInput"]',
       'textarea',
@@ -136,14 +137,16 @@ class QwenProvider {
 
   findSendButton() {
     const selectors = [
+      'button.send-button',
+      'button[class*="send-button"]',
+      'button.anticon',
+      'span.anticon.icon-send',
+      'svg[href="#icon-line-arrow-up"]',
       'div.MessageInput__Submit--mW8tX660',
       'div[class*="MessageInput__Submit"]',
       'i.icon-line-arrow-up',
-      '[class*="Submit"][class*="Icon"]',
       'button[aria-label="发送消息"]',
-      'button[aria-label*="发送"]',
-      'button[class*="sendChat"]',
-      '[class*="sendChat"]'
+      'button[aria-label*="发送"]'
     ];
 
     for (const sel of selectors) {
